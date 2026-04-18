@@ -1,8 +1,17 @@
 {
-  "name": "boeuftrack",
+  "name": "boeuftrack-api",
   "version": "1.0.0",
+  "description": "BoeufTrack - API d'estimation de poids bovin via Claude Vision",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "express": "4.18.2",
-    "cors": "2.8.5"
+    "@anthropic-ai/sdk": "^0.30.1",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
