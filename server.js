@@ -28,5 +28,4 @@ app.post('/analyze', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.listen(process.env.PORT || 8080
-, () => console.log('BoeufTrack API running'));
+app.listen(process.env.PORT || 8080, '0.0.0.0', () => console.log('BoeufTrack API running on port ' + (process.env.PORT || 8080)));
