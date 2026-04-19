@@ -42,6 +42,7 @@ const weighings = [];        // { id, boeufId, weight, date, ... }
     birthDate: '2024-06-15',
     tagId: 'AZ-001',
     notes: 'Bœuf de démonstration. Supprime-le une fois tes vrais animaux ajoutés.',
+    photoDataUrl: null,
     createdAt: new Date().toISOString()
   });
   const base = new Date();
@@ -73,25 +74,57 @@ app.get('/', (_req, res) => res.status(200).json({
 }));
 
 // ============================================================
-// /analyze : photo -> estimation poids via Claude Vision
+// /analyze : photos -> estimation poids via Claude Vision (multi-angles)
+// Accepte :
+//  - nouveau format : images: [{ data, mediaType, angle }]  (recommandé, 1 à 6 photos)
+//  - legacy       : imageBase64 + mediaType (1 seule photo)
 // ============================================================
+const MAX_IMAGES = 6;
+const stripPrefix = (b64) => (b64 && b64.includes(',')) ? b64.split(',')[1] : b64;
+
 app.post('/analyze', async (req, res) => {
   try {
-    const { imageBase64, mediaType = 'image/jpeg', breed, context } = req.body;
-    if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+    const { images, imageBase64, mediaType = 'image/jpeg', breed, context } = req.body;
 
-    // Nettoyer un éventuel prefix "data:image/jpeg;base64,"
-    const cleanB64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+    // Normaliser en tableau
+    let imgs = [];
+    if (Array.isArray(images) && images.length > 0) {
+      imgs = images.slice(0, MAX_IMAGES).map(it => ({
+        data: stripPrefix(it.data || it.imageBase64 || ''),
+        mediaType: it.mediaType || 'image/jpeg',
+        angle: it.angle || null
+      })).filter(it => it.data);
+    } else if (imageBase64) {
+      imgs = [{ data: stripPrefix(imageBase64), mediaType, angle: null }];
+    }
 
-    const prompt = `Tu es expert en élevage bovin, spécialisé dans l'estimation de poids vif par analyse visuelle de photos de bovins africains (zébu Azawak, N'Dama, Gudali, Goudali, Maure, métis, etc.).
+    if (imgs.length === 0) return res.status(400).json({ error: 'images[] ou imageBase64 requis' });
 
-Analyse cette photo et estime :
-1. Poids vif estimé en kg (valeur centrale)
-2. Fourchette min-max (kg)
-3. Niveau de confiance (0-100)
-4. Body Condition Score / Note d'état corporel (échelle 1 à 5)
-5. Observations : état général, morphologie, conformation, remarques utiles à l'éleveur
-6. Limitations : angle de photo, éléments manquants, facteurs d'incertitude
+    const multi = imgs.length > 1;
+    const angleList = imgs.map((im, i) => `Photo ${i + 1}${im.angle ? ` (${im.angle})` : ''}`).join(', ');
+
+    const prompt = `Tu es expert en élevage bovin, spécialisé dans l'estimation de poids vif par analyse visuelle de bovins africains (zébu Azawak, N'Dama, Gudali, Goudali, Maure, métis, etc.).
+
+${multi
+  ? `IMPORTANT : Tu reçois ${imgs.length} photos du MÊME animal prises sous différents angles (${angleList}). Tu dois les ANALYSER ENSEMBLE pour produire UNE SEULE estimation consolidée, pas une estimation par photo.
+
+Méthode :
+- Identifie les angles réellement disponibles (profil, face, dos, vue dorsale, etc.).
+- Pour chaque angle, extrais les indices pertinents (longueur du corps, tour de poitrine apparent, largeur du bassin, profondeur de flanc, état des côtes, musculature de l'arrière-train).
+- Croise les estimations issues de chaque angle pour réduire l'incertitude.
+- Si les photos se contredisent, prends l'estimation la plus étayée et explique pourquoi dans "observations".
+- La confiance doit refléter la QUALITÉ ET LA COMPLÉMENTARITÉ des angles : plusieurs angles exploitables => confiance plus élevée ; photos redondantes ou floues => confiance basse.
+- La fourchette min-max doit se resserrer quand tu as plusieurs angles utiles.`
+  : `Tu ne reçois qu'une seule photo. Signale dans "limitations" les angles manquants (profil, face, dos, bassin) qui permettraient une estimation plus précise.`}
+
+Tu dois estimer :
+1. Poids vif estimé en kg (valeur centrale, entier)
+2. Fourchette min-max (kg, entiers)
+3. Confiance (0-100) — cohérente avec le nombre et la qualité des angles disponibles
+4. BCS / Note d'état corporel (échelle 1 à 5, incréments de 0.5)
+5. Race probable (si non indiquée)
+6. Observations : morphologie, conformation, points d'attention éleveur, synthèse multi-angles
+7. Limitations : ce qui manque ou ce qui a entravé l'estimation
 
 ${breed ? `Race indiquée par l'éleveur : ${breed}` : 'Race : non précisée, à déduire de la morphologie'}
 ${context ? `Contexte : ${context}` : ''}
@@ -105,19 +138,22 @@ RÉPONDS UNIQUEMENT EN JSON VALIDE, sans texte avant ou après, sans balises mar
   "bcs": <number>,
   "breedGuess": "<string or null>",
   "observations": "<string>",
-  "limitations": "<string>"
+  "limitations": "<string>",
+  "anglesUsed": <number>
 }`;
+
+    // Construire le contenu multimodal : chaque image précédée d'un label d'angle
+    const content = [];
+    imgs.forEach((im, i) => {
+      content.push({ type: 'text', text: `Photo ${i + 1}${im.angle ? ` — angle : ${im.angle}` : ''} :` });
+      content.push({ type: 'image', source: { type: 'base64', media_type: im.mediaType, data: im.data } });
+    });
+    content.push({ type: 'text', text: prompt });
 
     const msg = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: cleanB64 } },
-          { type: 'text', text: prompt }
-        ]
-      }]
+      max_tokens: 1500,
+      messages: [{ role: 'user', content }]
     });
 
     const text = msg.content.map(c => c.text || '').join('');
@@ -125,7 +161,7 @@ RÉPONDS UNIQUEMENT EN JSON VALIDE, sans texte avant ou après, sans balises mar
     if (!jsonMatch) throw new Error('Pas de JSON dans la réponse Claude: ' + text.slice(0, 200));
     const result = JSON.parse(jsonMatch[0]);
 
-    res.json({ success: true, ...result });
+    res.json({ success: true, imagesAnalyzed: imgs.length, ...result });
   } catch (err) {
     console.error('[/analyze]', err);
     res.status(500).json({ success: false, error: err.message });
@@ -136,7 +172,7 @@ RÉPONDS UNIQUEMENT EN JSON VALIDE, sans texte avant ou après, sans balises mar
 // /boeufs : CRUD
 // ============================================================
 app.post('/boeufs', (req, res) => {
-  const { name, breed, birthDate, tagId, notes } = req.body;
+  const { name, breed, birthDate, tagId, notes, photoDataUrl } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
   const id = randomUUID();
   const boeuf = {
@@ -145,6 +181,7 @@ app.post('/boeufs', (req, res) => {
     birthDate: birthDate || null,
     tagId: tagId || null,
     notes: notes || '',
+    photoDataUrl: photoDataUrl || null,
     createdAt: new Date().toISOString()
   };
   boeufs.set(id, boeuf);
