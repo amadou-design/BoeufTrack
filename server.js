@@ -1,24 +1,28 @@
 // BoeufTrack API - Backend Express
-// Fix SIGTERM Railway : healthcheck /health, PORT dynamique, graceful shutdown
+// v2 : pipeline hybride CV + LLM pour l'estimation poids (voir ./lib/pipeline.js)
 // TODO PROD : remplacer le store en mémoire par Postgres (Railway -> Add Database -> Postgres)
+
+'use strict';
 
 const express = require('express');
 const cors = require('cors');
-const Anthropic = require('@anthropic-ai/sdk').default || require('@anthropic-ai/sdk');
 const { randomUUID } = require('crypto');
+const { analyzePhotos, MAX_IMAGES } = require('./lib/pipeline');
 
 // --- Env check ---
 if (!process.env.ANTHROPIC_API_KEY) {
   console.error('FATAL: ANTHROPIC_API_KEY env var missing');
   process.exit(1);
 }
+if (!process.env.HF_API_KEY) {
+  console.warn('[warn] HF_API_KEY absent : détection externe désactivée (dégradation gracieuse).');
+}
 
 const app = express();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // CORS ouvert pour l'app web. En prod, restreindre à ton domaine dashboard.
 app.use(cors());
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: '25mb' }));
 
 // Log minimal
 app.use((req, _res, next) => {
@@ -29,10 +33,9 @@ app.use((req, _res, next) => {
 // ============================================================
 // IN-MEMORY STORE (MVP)
 // ============================================================
-const boeufs = new Map();   // id -> boeuf
-const weighings = [];        // { id, boeufId, weight, date, ... }
+const boeufs = new Map();
+const weighings = [];
 
-// Seed : un bœuf de démo pour que le dashboard ne soit pas vide au premier lancement
 (function seed() {
   const id = 'demo-boeuf-001';
   boeufs.set(id, {
@@ -69,99 +72,67 @@ const weighings = [];        // { id, boeufId, weight, date, ... }
 app.get('/health', (_req, res) => res.status(200).json({ ok: true, ts: Date.now() }));
 app.get('/', (_req, res) => res.status(200).json({
   name: 'BoeufTrack API',
-  version: '1.0.0',
+  version: '2.0.0',
+  pipeline: 'hybrid-cv',
+  detection: Boolean(process.env.HF_API_KEY),
   endpoints: ['/health', '/analyze', '/boeufs', '/weighings', '/boeufs/:id/gmq']
 }));
 
 // ============================================================
-// /analyze : photos -> estimation poids via Claude Vision (multi-angles)
+// /analyze : pipeline hybride
 // Accepte :
 //  - nouveau format : images: [{ data, mediaType, angle }]  (recommandé, 1 à 6 photos)
 //  - legacy       : imageBase64 + mediaType (1 seule photo)
 // ============================================================
-const MAX_IMAGES = 6;
-const stripPrefix = (b64) => (b64 && b64.includes(',')) ? b64.split(',')[1] : b64;
-
 app.post('/analyze', async (req, res) => {
   try {
-    const { images, imageBase64, mediaType = 'image/jpeg', breed, context } = req.body;
+    const { images, imageBase64, mediaType = 'image/jpeg', breed, context } = req.body || {};
 
-    // Normaliser en tableau
     let imgs = [];
     if (Array.isArray(images) && images.length > 0) {
       imgs = images.slice(0, MAX_IMAGES).map(it => ({
-        data: stripPrefix(it.data || it.imageBase64 || ''),
+        data: it.data || it.imageBase64 || '',
         mediaType: it.mediaType || 'image/jpeg',
         angle: it.angle || null
       })).filter(it => it.data);
     } else if (imageBase64) {
-      imgs = [{ data: stripPrefix(imageBase64), mediaType, angle: null }];
+      imgs = [{ data: imageBase64, mediaType, angle: null }];
     }
 
-    if (imgs.length === 0) return res.status(400).json({ error: 'images[] ou imageBase64 requis' });
+    if (imgs.length === 0) return res.status(400).json({ success: false, error: 'images[] ou imageBase64 requis' });
 
-    const multi = imgs.length > 1;
-    const angleList = imgs.map((im, i) => `Photo ${i + 1}${im.angle ? ` (${im.angle})` : ''}`).join(', ');
+    const result = await analyzePhotos({ images: imgs, breed, context });
 
-    const prompt = `Tu es expert en élevage bovin, spécialisé dans l'estimation de poids vif par analyse visuelle de bovins africains (zébu Azawak, N'Dama, Gudali, Goudali, Maure, métis, etc.).
-
-${multi
-  ? `IMPORTANT : Tu reçois ${imgs.length} photos du MÊME animal prises sous différents angles (${angleList}). Tu dois les ANALYSER ENSEMBLE pour produire UNE SEULE estimation consolidée, pas une estimation par photo.
-
-Méthode :
-- Identifie les angles réellement disponibles (profil, face, dos, vue dorsale, etc.).
-- Pour chaque angle, extrais les indices pertinents (longueur du corps, tour de poitrine apparent, largeur du bassin, profondeur de flanc, état des côtes, musculature de l'arrière-train).
-- Croise les estimations issues de chaque angle pour réduire l'incertitude.
-- Si les photos se contredisent, prends l'estimation la plus étayée et explique pourquoi dans "observations".
-- La confiance doit refléter la QUALITÉ ET LA COMPLÉMENTARITÉ des angles : plusieurs angles exploitables => confiance plus élevée ; photos redondantes ou floues => confiance basse.
-- La fourchette min-max doit se resserrer quand tu as plusieurs angles utiles.`
-  : `Tu ne reçois qu'une seule photo. Signale dans "limitations" les angles manquants (profil, face, dos, bassin) qui permettraient une estimation plus précise.`}
-
-Tu dois estimer :
-1. Poids vif estimé en kg (valeur centrale, entier)
-2. Fourchette min-max (kg, entiers)
-3. Confiance (0-100) — cohérente avec le nombre et la qualité des angles disponibles
-4. BCS / Note d'état corporel (échelle 1 à 5, incréments de 0.5)
-5. Race probable (si non indiquée)
-6. Observations : morphologie, conformation, points d'attention éleveur, synthèse multi-angles
-7. Limitations : ce qui manque ou ce qui a entravé l'estimation
-
-${breed ? `Race indiquée par l'éleveur : ${breed}` : 'Race : non précisée, à déduire de la morphologie'}
-${context ? `Contexte : ${context}` : ''}
-
-RÉPONDS UNIQUEMENT EN JSON VALIDE, sans texte avant ou après, sans balises markdown :
-{
-  "weightKg": <number>,
-  "rangeMin": <number>,
-  "rangeMax": <number>,
-  "confidence": <number>,
-  "bcs": <number>,
-  "breedGuess": "<string or null>",
-  "observations": "<string>",
-  "limitations": "<string>",
-  "anglesUsed": <number>
-}`;
-
-    // Construire le contenu multimodal : chaque image précédée d'un label d'angle
-    const content = [];
-    imgs.forEach((im, i) => {
-      content.push({ type: 'text', text: `Photo ${i + 1}${im.angle ? ` — angle : ${im.angle}` : ''} :` });
-      content.push({ type: 'image', source: { type: 'base64', media_type: im.mediaType, data: im.data } });
+    // Réponse : on garde les champs historiques pour compat dashboard,
+    // et on ajoute les nouveaux champs exposés par la fusion.
+    res.json({
+      success: true,
+      // compat
+      imagesAnalyzed: result.imagesUsed,
+      observations: result.narrative,
+      limitations: result.limitations,
+      anglesUsed: result.anglesDistinct,
+      // estimation
+      weightKg: result.weightKg,
+      rangeMin: result.rangeMin,
+      rangeMax: result.rangeMax,
+      confidence: result.confidence,
+      confidenceBand: result.confidenceBand,
+      bcs: result.bcs,
+      breedGuess: result.breedGuess,
+      // diagnostics pipeline
+      narrative: result.narrative,
+      breedResolved: result.breedResolved,
+      imagesProvided: result.imagesProvided,
+      imagesUsed: result.imagesUsed,
+      imagesUnreadable: result.imagesUnreadable,
+      rejectedCount: result.rejectedCount,
+      perImage: result.perImage,
+      outliers: result.outliers,
+      detectionAvailable: result.detectionAvailable,
+      llmFailures: result.llmFailures,
+      processingMs: result.processingMs
     });
-    content.push({ type: 'text', text: prompt });
-
-    const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1500,
-      messages: [{ role: 'user', content }]
-    });
-
-    const text = msg.content.map(c => c.text || '').join('');
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Pas de JSON dans la réponse Claude: ' + text.slice(0, 200));
-    const result = JSON.parse(jsonMatch[0]);
-
-    res.json({ success: true, imagesAnalyzed: imgs.length, ...result });
   } catch (err) {
     console.error('[/analyze]', err);
     res.status(500).json({ success: false, error: err.message });
@@ -209,7 +180,6 @@ app.patch('/boeufs/:id', (req, res) => {
 app.delete('/boeufs/:id', (req, res) => {
   if (!boeufs.has(req.params.id)) return res.status(404).json({ error: 'not found' });
   boeufs.delete(req.params.id);
-  // Supprime les pesées associées
   for (let i = weighings.length - 1; i >= 0; i--) {
     if (weighings[i].boeufId === req.params.id) weighings.splice(i, 1);
   }
@@ -217,7 +187,7 @@ app.delete('/boeufs/:id', (req, res) => {
 });
 
 // ============================================================
-// /weighings : pesées
+// /weighings
 // ============================================================
 app.post('/weighings', (req, res) => {
   const { boeufId, weight, date, confidence, bcs, observations, photoDataUrl } = req.body;
@@ -253,7 +223,7 @@ app.delete('/weighings/:id', (req, res) => {
 });
 
 // ============================================================
-// GMQ : Gain Moyen Quotidien
+// GMQ
 // ============================================================
 app.get('/boeufs/:id/gmq', (req, res) => {
   const list = weighings
@@ -265,7 +235,6 @@ app.get('/boeufs/:id/gmq', (req, res) => {
   const days = (new Date(last.date) - new Date(first.date)) / 86400000;
   if (days <= 0) return res.json({ gmq: null, reason: 'invalid dates' });
   const gmq = (last.weight - first.weight) / days;
-  // GMQ intermédiaires (par intervalle)
   const intervals = [];
   for (let i = 1; i < list.length; i++) {
     const d = (new Date(list[i].date) - new Date(list[i - 1].date)) / 86400000;
@@ -293,7 +262,8 @@ app.get('/boeufs/:id/gmq', (req, res) => {
 // ============================================================
 const PORT = process.env.PORT || 8080;
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`BoeufTrack API running on port ${PORT}`);
+  console.log(`BoeufTrack API v2 running on port ${PORT}`);
+  console.log(`  detection: ${process.env.HF_API_KEY ? 'enabled (HF DETR)' : 'disabled (no HF_API_KEY)'}`);
 });
 
 const shutdown = (sig) => {
@@ -309,9 +279,5 @@ const shutdown = (sig) => {
 };
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('uncaughtException', (err) => {
-  console.error('uncaughtException', err);
-});
-process.on('unhandledRejection', (err) => {
-  console.error('unhandledRejection', err);
-});
+process.on('uncaughtException', (err) => { console.error('uncaughtException', err); });
+process.on('unhandledRejection', (err) => { console.error('unhandledRejection', err); });
