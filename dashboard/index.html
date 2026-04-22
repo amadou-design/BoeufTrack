@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BoeufTrack — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    /* ===== PALETTE — Savane moderne ===== */
+    --bg: #faf7f0;
+    --surface: #ffffff;
+    --surface-alt: #f4efe3;
+    --surface-soft: #fbf8f1;
+    --ink: #1f2418;
+    --ink-soft: #4d5246;
+    --ink-mute: #8a8d82;
+    --border: #e8e1cf;
+    --border-strong: #d6cdb4;
+    --accent: #b8820a;
+    --accent-ink: #8a5f06;
+    --accent-soft: #f7ecd0;
+    --forest: #2d4a2b;
+    --forest-soft: #e3ecdf;
+    --clay: #a14f2c;
+    --clay-soft: #f3e1d6;
+    --crimson: #9a2c2c;
+    --crimson-soft: #f4dede;
+    /* Legacy aliases pour compat */
+    --panel: var(--surface);
+    --panel-2: var(--surface-alt);
+    --text: var(--ink);
+    --muted: var(--ink-mute);
+    --accent-2: var(--accent-ink);
+    --ok: var(--forest);
+    --warn: var(--clay);
+    --err: var(--crimson);
+    /* Spacing 8pt */
+    --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
+    --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
+    /* Radius */
+    --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px; --r-full: 9999px;
+    --radius: var(--r-lg);
+    /* Ombres */
+    --shadow-xs: 0 1px 2px rgba(15,20,10,0.04);
+    --shadow-sm: 0 1px 2px rgba(15,20,10,0.04), 0 2px 6px rgba(15,20,10,0.06);
+    --shadow-md: 0 2px 6px rgba(15,20,10,0.06), 0 12px 28px -12px rgba(15,20,10,0.14);
+    --shadow-lg: 0 24px 48px -16px rgba(15,20,10,0.18);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv11";
+  }
+  .tnum, .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum","lnum"; }
+  ::selection { background: var(--accent-soft); color: var(--ink); }
+  a { color: var(--accent-ink); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  svg { display: block; }
+  /* ===== HEADER ===== */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+    backdrop-filter: saturate(140%);
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 16px; letter-spacing: -0.01em; color: var(--ink);
+  }
+  .brand-mark {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, #e0b34b 0%, #b8820a 55%, #7a5305 100%);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(184,130,10,0.25), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .brand-mark svg { width: 18px; height: 18px; }
+  .brand-name { display: inline-flex; align-items: baseline; gap: 6px; }
+  .brand-name sup { font-size: 10px; color: var(--ink-mute); font-weight: 500; letter-spacing: 0; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .api-status {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--ink-soft); font-weight: 500;
+    padding: 5px 11px; background: var(--surface-alt);
+    border: 1px solid var(--border); border-radius: var(--r-full);
+  }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-mute); }
+  .status-dot.ok { background: var(--forest); box-shadow: 0 0 0 3px var(--forest-soft); }
+  .status-dot.err { background: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-soft); }
+  .btn-cfg {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--ink-soft); padding: 6px 12px;
+    border-radius: var(--r-md); cursor: pointer; font-size: 12px;
+    font-weight: 500; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .btn-cfg:hover { background: var(--surface-alt); border-color: var(--border-strong); color: var(--ink); }
+  .btn-cfg svg { width: 13px; height: 13px; }
+  /* ===== LAYOUT ===== */
+  .layout {
+    display: grid; grid-template-columns: 300px 1fr;
+    min-height: calc(100vh - 61px);
+  }
+  aside {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px 14px;
+    overflow-y: auto;
+  }
+  main { padding: 28px 36px 64px; overflow-y: auto; min-width: 0; }
+  /* ===== SIDEBAR ===== */
+  .sidebar-title {
+    font-size: 10.5px; text-transform: uppercase; color: var(--ink-mute);
+    letter-spacing: 0.1em; margin-bottom: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 6px; font-weight: 600;
+  }
+  .btn-add {
+    background: var(--ink); color: #fff; border: none;
+    padding: 6px 12px; border-radius: var(--r-full);
+    cursor: pointer; font-size: 11px; font-weight: 600; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: background .15s;
+  }
+  .btn-add:hover { background: var(--accent-ink); }
+  .boeuf-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+  .boeuf-item {
+    padding: 10px; border-radius: var(--r-md); cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    transition: background .15s, border-color .15s;
+    border: 1px solid transparent;
+  }
+  .boeuf-item:hover { background: var(--surface-alt); }
+  .boeuf-item.active {
+    background: var(--accent-soft);
+    border-color: rgba(184,130,10,0.25);
+  }
+  .boeuf-item.active .boeuf-item-name { color: var(--accent-ink); }
+  .boeuf-item-body { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+  .boeuf-item-name { font-weight: 600; font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .boeuf-item-meta { font-size: 11.5px; color: var(--ink-mute); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .boeuf-avatar {
+    width: 42px; height: 42px; border-radius: var(--r-md);
+    flex-shrink: 0; background: var(--surface-alt);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-mute); font-size: 18px;
+    border: 1px solid var(--border); overflow: hidden;
+  }
+  .boeuf-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .sidebar-empty { color: var(--ink-mute); font-size: 12px; padding: 14px 10px; text-align: center; line-height: 1.5; }
+  /* ===== PROFILE HEADER ===== */
+  .profile-header {
+    display: flex; gap: 22px; align-items: center;
+    margin-bottom: 28px;
+  }
+  .profile-photo {
+    width: 128px; height: 128px; border-radius: var(--r-lg);
+    background: var(--surface-alt);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-mute); font-size: 44px;
+    overflow: hidden; flex-shrink: 0;
+    border: 1px solid var(--border);
+    cursor: pointer; position: relative;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow .15s, transform .15s;
+  }
+  .profile-photo:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .profile-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-photo .edit-overlay {
+    position: absolute; inset: 0; background: rgba(31,36,24,0.55);
+    display: none; align-items: center; justify-content: center;
+    color: white; font-size: 12px; text-align: center; padding: 8px;
+    backdrop-filter: blur(2px);
+  }
+  .profile-photo:hover .edit-overlay { display: flex; }
+  .profile-info { flex: 1; min-width: 0; }
+  .profile-info-top {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  }
+  .profile-badges {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;
+  }
+  /* ===== BADGES / PILLS ===== */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full);
+    background: var(--surface-alt); color: var(--ink-soft);
+    border: 1px solid var(--border);
+    line-height: 1.3;
+  }
+  .badge-accent { background: var(--accent-soft); color: var(--accent-ink); border-color: rgba(184,130,10,0.2); }
+  .badge-forest { background: var(--forest-soft); color: var(--forest); border-color: rgba(45,74,43,0.15); }
+  .badge-clay { background: var(--clay-soft); color: var(--clay); border-color: rgba(161,79,44,0.15); }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.7; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 9px; border-radius: var(--r-full);
+    font-size: 11.5px; font-weight: 600;
+    background: var(--surface-alt); color: var(--ink-soft);
+    border: 1px solid var(--border);
+    font-variant-numeric: tabular-nums;
+  }
+  .pill.good { background: var(--forest-soft); color: var(--forest); border-color: transparent; }
+  .pill.mid { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+  .pill.low { background: var(--clay-soft); color: var(--clay); border-color: transparent; }
+  /* ===== MAIN / TYPO ===== */
+  h1 {
+    font-size: clamp(22px, 2.5vw, 28px); font-weight: 700;
+    letter-spacing: -0.02em; color: var(--ink);
+  }
+  h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .subtitle { color: var(--ink-mute); font-size: 14px; margin-top: 2px; }
+  /* ===== EMPTY STATE ===== */
+  .empty-state {
+    text-align: center; padding: 80px 20px;
+    max-width: 520px; margin: 0 auto;
+  }
+  .empty-illus {
+    width: 96px; height: 96px; margin: 0 auto 24px;
+    border-radius: var(--r-xl);
+    background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface-alt) 100%);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+  }
+  .empty-illus svg { width: 44px; height: 44px; }
+  .empty-state h2 {
+    color: var(--ink); font-size: 22px; margin-bottom: 8px;
+    letter-spacing: -0.01em; font-weight: 700;
+  }
+  .empty-state p { color: var(--ink-mute); font-size: 14.5px; line-height: 1.6; }
+  /* ===== STATS CARDS ===== */
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 14px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 18px 18px 16px;
+    position: relative;
+    transition: box-shadow .15s, transform .15s, border-color .15s;
+  }
+  .stat-card:hover { box-shadow: var(--shadow-sm); border-color: var(--border-strong); }
+  .stat-card-icon {
+    position: absolute; top: 14px; right: 14px;
+    width: 30px; height: 30px; border-radius: var(--r-md);
+    background: var(--accent-soft); color: var(--accent-ink);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .stat-card-icon svg { width: 15px; height: 15px; }
+  .stat-label {
+    font-size: 10.5px; text-transform: uppercase; color: var(--ink-mute);
+    margin-bottom: 10px; letter-spacing: 0.09em; font-weight: 600;
+  }
+  .stat-value {
+    font-size: 26px; font-weight: 700; color: var(--ink);
+    letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .stat-unit {
+    font-size: 13px; color: var(--ink-mute); margin-left: 4px;
+    font-weight: 500; letter-spacing: 0;
+  }
+  .stat-meta { font-size: 12px; color: var(--ink-mute); margin-top: 8px; }
+  .stat-value.gmq-good { color: var(--forest); }
+  .stat-value.gmq-warn { color: var(--clay); }
+  /* ===== PANELS ===== */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 22px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-xs);
+  }
+  .panel-title {
+    font-size: 15px; font-weight: 600; color: var(--ink);
+    margin-bottom: 18px;
+    display: flex; justify-content: space-between; align-items: center;
+    letter-spacing: -0.005em;
+  }
+  /* ===== UPLOAD ZONE ===== */
+  .upload-zone {
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--r-lg);
+    padding: 36px 20px;
+    text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s;
+    background: var(--surface-soft);
+  }
+  .upload-zone:hover, .upload-zone.drag {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .upload-zone.has-preview { padding: 18px; }
+  .upload-preview { max-width: 100%; max-height: 300px; border-radius: var(--r-md); }
+  .upload-hint {
+    color: var(--ink-mute); font-size: 13px; margin-top: 10px;
+    line-height: 1.55; max-width: 520px; margin-left: auto; margin-right: auto;
+  }
+  .upload-hint strong { color: var(--ink-soft); font-weight: 600; }
+  .upload-icon {
+    width: 46px; height: 46px; margin: 0 auto 12px;
+    border-radius: var(--r-md);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+  }
+  .upload-icon svg { width: 22px; height: 22px; }
+  .upload-title { font-weight: 600; color: var(--ink); font-size: 14.5px; }
+  /* ===== PHOTO GRID (thumbs) ===== */
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .photo-thumb {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 8px;
+    position: relative;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .photo-thumb:hover { border-color: var(--border-strong); box-shadow: var(--shadow-xs); }
+  .photo-thumb img {
+    width: 100%; height: 108px;
+    object-fit: cover; border-radius: var(--r-sm);
+    display: block;
+  }
+  .photo-thumb select {
+    margin-top: 6px; font-size: 12px; padding: 6px 8px;
+    background: var(--surface-soft);
+  }
+  .photo-thumb-close {
+    position: absolute; top: 6px; right: 6px;
+    background: rgba(31,36,24,0.75); color: #fff;
+    border: none; border-radius: 50%;
+    width: 22px; height: 22px; cursor: pointer;
+    font-size: 13px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+  }
+  .photo-thumb-close:hover { background: var(--crimson); }
+  /* ===== FORMS ===== */
+  input, select, textarea {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    width: 100%;
+    font-family: inherit; font-size: 14px; line-height: 1.4;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input::placeholder, textarea::placeholder { color: var(--ink-mute); }
+  input:hover, select:hover, textarea:hover { border-color: var(--border-strong); }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  label {
+    display: block; font-size: 12px; color: var(--ink-soft);
+    margin-bottom: 6px; margin-top: 14px; font-weight: 500;
+  }
+  /* ===== BUTTONS ===== */
+  .btn {
+    background: var(--ink); color: #fff; border: none;
+    padding: 11px 18px; border-radius: var(--r-md);
+    cursor: pointer; font-weight: 600; font-size: 14px;
+    font-family: inherit;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: background .15s, transform .05s, box-shadow .15s;
+    letter-spacing: -0.005em;
+  }
+  .btn:hover { background: var(--accent-ink); }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-secondary {
+    background: var(--surface); color: var(--ink-soft);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--surface-alt); color: var(--ink); border-color: var(--border-strong); }
+  .btn-danger {
+    background: transparent; color: var(--crimson);
+    border: 1px solid var(--border);
+    padding: 8px 14px; font-size: 13px;
+  }
+  .btn-danger:hover { background: var(--crimson-soft); border-color: var(--crimson-soft); }
+  .btn-row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .btn svg { width: 15px; height: 15px; }
+  /* ===== ANALYSIS RESULT ===== */
+  .analysis-result {
+    background: linear-gradient(180deg, rgba(247,236,208,0.6) 0%, var(--surface-soft) 100%);
+    border: 1px solid var(--border-strong);
+    border-left: 4px solid var(--accent);
+    padding: 22px; border-radius: var(--r-lg);
+    margin-top: 20px;
+  }
+  .analysis-narrative {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--forest);
+    padding: 10px 14px;
+    border-radius: var(--r-md);
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .analysis-narrative strong { color: var(--ink); font-weight: 600; }
+  .analysis-head {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  .analysis-weight {
+    font-size: clamp(32px, 5vw, 42px); font-weight: 700;
+    color: var(--accent-ink);
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .analysis-range {
+    color: var(--ink-soft); font-size: 14px;
+    font-weight: 500; font-variant-numeric: tabular-nums;
+  }
+  .analysis-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 10px; margin: 20px 0;
+  }
+  .analysis-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 10px 12px;
+  }
+  .analysis-item-label {
+    color: var(--ink-mute); font-size: 10px;
+    text-transform: uppercase; font-weight: 600; letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .analysis-item > div:last-child {
+    font-size: 15px; font-weight: 600; color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .analysis-obs {
+    margin-top: 12px; font-size: 13.5px;
+    line-height: 1.6; color: var(--ink-soft);
+  }
+  .analysis-obs strong { color: var(--ink); font-weight: 600; }
+  /* ===== TABLE ===== */
+  .table-wrap { overflow-x: auto; border-radius: var(--r-md); }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; }
+  th, td {
+    padding: 13px 14px; text-align: left; font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  th {
+    color: var(--ink-mute); font-weight: 600; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    background: var(--surface-soft);
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background .1s; }
+  tbody tr:hover { background: var(--surface-soft); }
+  .weighing-photo {
+    width: 44px; height: 44px; object-fit: cover;
+    border-radius: var(--r-md); border: 1px solid var(--border);
+    display: block;
+  }
+  .weighing-photo-ph {
+    width: 44px; height: 44px; border-radius: var(--r-md);
+    background: var(--surface-alt); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-mute); font-size: 16px;
+  }
+  .weight-cell { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .table-empty {
+    text-align: center; padding: 36px 20px;
+    color: var(--ink-mute); font-size: 13.5px;
+  }
+  /* ===== MINI PHOTO ZONE (modal) ===== */
+  .mini-photo-zone {
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--r-md);
+    padding: 20px;
+    text-align: center; cursor: pointer;
+    background: var(--surface-soft);
+    font-size: 13px; color: var(--ink-mute);
+    transition: all .15s;
+  }
+  .mini-photo-zone:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .mini-photo-zone.has { padding: 10px; }
+  .mini-photo-zone img {
+    max-height: 140px; max-width: 100%; border-radius: var(--r-sm);
+  }
+  /* ===== MODAL ===== */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(31,36,24,0.45);
+    backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; animation: fadeIn .15s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 28px;
+    width: 100%; max-width: 480px;
+    box-shadow: var(--shadow-lg);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal h2 {
+    font-size: 20px; margin-bottom: 4px;
+    letter-spacing: -0.01em; color: var(--ink);
+  }
+  .modal-sub {
+    color: var(--ink-mute); font-size: 13.5px;
+    margin-bottom: 18px;
+  }
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--ink); color: #fff;
+    padding: 13px 18px; border-radius: var(--r-md);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(140%); transition: transform .25s cubic-bezier(.3,.7,.3,1);
+    max-width: 360px; z-index: 200; font-size: 13.5px; font-weight: 500;
+    border-left: 3px solid var(--accent);
+  }
+  .toast.show { transform: translateY(0); }
+  .toast.err { border-left-color: var(--crimson); }
+  .toast.ok { border-left-color: var(--forest); }
+  /* ===== LOADER ===== */
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block; vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { border-right: none; border-bottom: 1px solid var(--border); max-height: 38vh; padding: 16px 14px; }
+    main { padding: 20px 16px 48px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .analysis-grid { grid-template-columns: repeat(2, 1fr); }
+    .profile-header { gap: 16px; }
+    .profile-photo { width: 92px; height: 92px; font-size: 34px; }
+    h1 { font-size: 22px; }
+    .panel { padding: 18px; }
+  }
+  @media (max-width: 520px) {
+    header { padding: 12px 14px; }
+    .api-status span:last-child { display: none; }
+    .btn-cfg span { display: none; }
+    .analysis-weight { font-size: 30px; }
+    .analysis-grid { grid-template-columns: 1fr 1fr; }
+    .stat-card { padding: 16px 14px; }
+  }
+  /* ===== CARCASS CALIBRATION ===== */
+  .carcass-panel { }
+  .carcass-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 10px; margin-bottom: 16px;
+  }
+  .carcass-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 10px 12px;
+  }
+  .carcass-stat-label {
+    color: var(--ink-mute); font-size: 10px; letter-spacing: 0.08em;
+    text-transform: uppercase; font-weight: 600; margin-bottom: 4px;
+  }
+  .carcass-stat-value {
+    font-size: 18px; font-weight: 700;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+  }
+  .carcass-stat-sub { color: var(--ink-mute); font-size: 11px; margin-top: 2px; }
+  .carcass-form {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end;
+    padding: 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-md); margin-bottom: 14px;
+  }
+  .carcass-form label { font-size: 11px; color: var(--ink-mute); font-weight: 600; }
+  .carcass-form input {
+    width: 100%; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    background: var(--surface); color: var(--ink);
+    font-size: 14px;
+  }
+  .carcass-list { display: flex; flex-direction: column; gap: 8px; }
+  .carcass-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto;
+    gap: 8px; padding: 10px 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-md); align-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .carcass-row.anomaly { border-left: 3px solid var(--crimson); }
+  .carcass-row.good { border-left: 3px solid var(--forest); }
+  .carcass-row-cell { display: flex; flex-direction: column; }
+  .carcass-row-label { font-size: 10px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.05em; }
+  .carcass-row-value { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .carcass-err-pos { color: var(--clay); }
+  .carcass-err-neg { color: var(--forest); }
+  .carcass-err-big { color: var(--crimson); }
+  .carcass-empty {
+    text-align: center; padding: 32px 16px;
+    color: var(--ink-mute); font-size: 13px;
+  }
+  @media (max-width: 720px) {
+    .carcass-stats { grid-template-columns: repeat(2, 1fr); }
+    .carcass-form { grid-template-columns: 1fr; }
+    .carcass-row { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 5c1.5-1 3.5-.5 4 1"/>
+        <path d="M19 5c-1.5-1-3.5-.5-4 1"/>
+        <path d="M6 9a6 6 0 0 0 12 0"/>
+        <circle cx="9.5" cy="12" r="0.8" fill="currentColor"/>
+        <circle cx="14.5" cy="12" r="0.8" fill="currentColor"/>
+        <path d="M10 16h4"/>
+        <path d="M12 16v3"/>
+      </svg>
+    </span>
+    <span class="brand-name">BoeufTrack</span>
+  </div>
+  <div class="header-right">
+    <div class="api-status">
+      <span class="status-dot" id="apiStatus"></span>
+      <span id="apiStatusText">Connexion…</span>
+    </div>
+    <button class="btn-cfg" onclick="openConfigModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      <span>Paramètres</span>
+    </button>
+  </div>
+</header>
+<div class="layout">
+  <aside>
+    <div class="sidebar-title">
+      <span>Mes bœufs</span>
+      <button class="btn-add" onclick="openAddBoeufModal()">+ Ajouter</button>
+    </div>
+    <ul class="boeuf-list" id="boeufList"></ul>
+  </aside>
+  <main id="mainContent">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-illus" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 10c3-2 7-1 8 2"/>
+          <path d="M38 10c-3-2-7-1-8 2"/>
+          <path d="M12 18a12 12 0 0 0 24 0"/>
+          <circle cx="19" cy="24" r="1.4" fill="currentColor"/>
+          <circle cx="29" cy="24" r="1.4" fill="currentColor"/>
+          <path d="M20 32h8"/>
+          <path d="M24 32v6"/>
+        </svg>
+      </div>
+      <h2>Bienvenue sur BoeufTrack</h2>
+      <p>Sélectionne un bœuf dans la liste à gauche, ou ajoute ton premier animal pour démarrer le suivi IA.</p>
+    </div>
+    <div id="boeufDetail" style="display:none;">
+      <div class="profile-header">
+        <div class="profile-photo" id="profilePhoto" onclick="document.getElementById('profilePhotoInput').click()" title="Cliquer pour changer la photo">
+          <span id="profilePhotoPlaceholder">🐂</span>
+          <div class="edit-overlay">Changer<br>la photo</div>
+        </div>
+        <input type="file" id="profilePhotoInput" accept="image/*" style="display:none;" onchange="uploadProfilePhoto()" />
+        <div class="profile-info">
+          <div class="profile-info-top">
+            <div style="min-width:0;">
+              <h1 id="bName">—</h1>
+              <div class="subtitle" id="bMeta">—</div>
+              <div class="profile-badges" id="bBadges"></div>
+            </div>
+            <button class="btn-danger" onclick="deleteBoeuf()">Supprimer</button>
+          </div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l-1 12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/></svg>
+          </div>
+          <div class="stat-label">Poids actuel</div>
+          <div class="stat-value" id="sPoids">—<span class="stat-unit">kg</span></div>
+          <div class="stat-meta" id="sPoidsMeta">Aucune pesée</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+          </div>
+          <div class="stat-label">GMQ</div>
+          <div class="stat-value" id="sGmq">—<span class="stat-unit">g/j</span></div>
+          <div class="stat-meta" id="sGmqMeta">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          </div>
+          <div class="stat-label">Gain total</div>
+          <div class="stat-value" id="sGain">—<span class="stat-unit">kg</span></div>
+          <div class="stat-meta" id="sGainMeta">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+          </div>
+          <div class="stat-label">Pesées</div>
+          <div class="stat-value" id="sNb">0</div>
+          <div class="stat-meta" id="sNbMeta">—</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">
+          <span>Nouvelle pesée — Analyse multi-photos IA</span>
+          <span class="badge badge-accent"><span class="badge-dot"></span>Claude Vision</span>
+        </div>
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </div>
+          <div class="upload-title">Dépose 1 à 6 photos ou clique pour choisir</div>
+          <div class="upload-hint">
+            Une seule photo suffit pour une première estimation. Pour plus de précision, ajoute d'autres angles : <strong>profil</strong>, <strong>face</strong>, <strong>arrière</strong>, <strong>dessus du dos</strong>. Animal entier, bien droit, ~2–3 m de distance. JPG/PNG &lt; 10 Mo chacun.
+          </div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" multiple style="display:none;" />
+        <div id="photoList" style="display:none; margin-top:14px;">
+          <div id="photoGrid" class="photo-grid"></div>
+          <div class="upload-hint" style="margin-top:10px;">Associe un angle à chaque photo pour plus de précision.</div>
+        </div>
+        <div id="analyzeControls" style="display:none; margin-top:16px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+              <label>Contexte (optionnel)</label>
+              <input type="text" id="ctxInput" placeholder="Ex : 18 mois, embouche 45 j" />
+            </div>
+            <div>
+              <label>Date de la pesée</label>
+              <input type="date" id="dateInput" />
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="analyzeBtn" onclick="analyzePhoto()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2a8 8 0 1 0 9.9 9.9"/><path d="M14 4l6 6"/><path d="M20 4l-6 6"/></svg>
+              Analyser <span id="analyzeCount"></span>
+            </button>
+            <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">+ Ajouter photos</button>
+            <button class="btn-secondary" onclick="resetUpload()">Annuler</button>
+          </div>
+        </div>
+        <div class="analysis-result" id="analysisResult" style="display:none;">
+          <div class="analysis-narrative" id="rNarrative" style="display:none;"></div>
+          <div class="analysis-head">
+            <span class="analysis-weight" id="rWeight">—</span>
+            <span class="analysis-range" id="rRange"></span>
+          </div>
+          <div class="analysis-grid">
+            <div class="analysis-item">
+              <div class="analysis-item-label">Confiance</div>
+              <div id="rConf">—</div>
+            </div>
+            <div class="analysis-item">
+              <div class="analysis-item-label">Note d'état (BCS)</div>
+              <div id="rBcs">—</div>
+            </div>
+            <div class="analysis-item">
+              <div class="analysis-item-label">Race détectée</div>
+              <div id="rBreed">—</div>
+            </div>
+            <div class="analysis-item">
+              <div class="analysis-item-label">Photos analysées</div>
+              <div id="rImgs">—</div>
+            </div>
+          </div>
+          <div class="analysis-obs"><strong>Observations.</strong> <span id="rObs">—</span></div>
+          <div class="analysis-obs" style="color:var(--ink-mute);"><strong>Limites.</strong> <span id="rLim">—</span></div>
+          <div class="btn-row">
+            <button class="btn" onclick="saveWeighing()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>
+              Enregistrer cette pesée
+            </button>
+            <button class="btn-secondary" onclick="resetUpload()">Recommencer</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Courbe de croissance</div>
+        <div style="position:relative; height:280px;">
+          <canvas id="growthChart"></canvas>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Historique des pesées</div>
+        <div class="table-wrap" id="weighingsTable"></div>
+      </div>
+      <div class="panel carcass-panel">
+        <div class="panel-title">
+          Calibration carcasse
+          <span style="font-size:11px; font-weight:400; color:var(--ink-mute); margin-left:8px;">
+            Compare l'estimation IA au vrai poids carcasse après ressuyage
+          </span>
+        </div>
+
+        <!-- Formulaire ajout abattage -->
+        <form class="carcass-form" onsubmit="event.preventDefault(); saveSlaughter();">
+          <div>
+            <label>Date d'abattage</label>
+            <input type="date" id="slDate" required />
+          </div>
+          <div>
+            <label>Poids carcasse (kg après ressuyage)</label>
+            <input type="number" id="slCarcass" min="30" max="600" step="0.1" placeholder="ex : 215" required />
+          </div>
+          <div>
+            <label>Rendement connu (optionnel)</label>
+            <input type="number" id="slYield" min="0.40" max="0.65" step="0.01" placeholder="ex : 0.52" />
+          </div>
+          <div style="grid-column: 1 / -1;">
+            <label>Poids vif estimé IA à l'abattage (optionnel)<span style="color:var(--ink-mute); font-weight:400;"> — saisie manuelle prioritaire sur le matching auto des pesées IA</span></label>
+            <input type="number" id="slAiWeight" min="50" max="1200" step="0.1" placeholder="ex : 395 (si ton historique IA n'est pas aligné sur la date d'abattage)" />
+          </div>
+          <div style="grid-column: 1 / -1; display:flex; gap:8px;">
+            <button type="submit" class="btn">Enregistrer l'abattage</button>
+            <button type="button" class="btn-secondary" onclick="['slDate','slCarcass','slYield','slAiWeight'].forEach(i=>document.getElementById(i).value='');">Reset</button>
+          </div>
+        </form>
+
+        <!-- Abattages du bœuf sélectionné -->
+        <div id="carcassList" class="carcass-list">
+          <div class="carcass-empty">Aucun abattage enregistré pour ce bœuf.</div>
+        </div>
+
+        <!-- Stats globales troupeau -->
+        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+          <div class="panel-title" style="margin-bottom: 10px; font-size: 13px;">Précision globale du modèle (tout le troupeau)</div>
+          <div id="carcassStats" class="carcass-stats">
+            <div class="carcass-stat">
+              <div class="carcass-stat-label">Biais</div>
+              <div class="carcass-stat-value" id="stBias">—</div>
+              <div class="carcass-stat-sub">+ : IA surestime</div>
+            </div>
+            <div class="carcass-stat">
+              <div class="carcass-stat-label">MAE</div>
+              <div class="carcass-stat-value" id="stMae">—</div>
+              <div class="carcass-stat-sub">erreur absolue moyenne</div>
+            </div>
+            <div class="carcass-stat">
+              <div class="carcass-stat-label">RMSE</div>
+              <div class="carcass-stat-value" id="stRmse">—</div>
+              <div class="carcass-stat-sub">pénalise gros écarts</div>
+            </div>
+            <div class="carcass-stat">
+              <div class="carcass-stat-label">Rendement implicite</div>
+              <div class="carcass-stat-value" id="stYield">—</div>
+              <div class="carcass-stat-sub" id="stYieldSub">sur N abattages</div>
+            </div>
+          </div>
+
+          <div style="position:relative; height:220px; margin-top:16px;">
+            <canvas id="errorHistogram"></canvas>
+          </div>
+
+          <div style="position:relative; height:200px; margin-top:16px;">
+            <canvas id="precisionTimeline"></canvas>
+          </div>
+
+          <div id="carcassAnomalies" style="margin-top:12px;"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<!-- MODAL AJOUT BŒUF -->
+<div class="modal-overlay" id="addBoeufModal">
+  <div class="modal">
+    <h2>Nouveau bœuf</h2>
+    <p class="modal-sub">Ajoute un animal à ton troupeau. Une photo de profil aide à l'identifier plus tard.</p>
+    <label>Photo du bœuf</label>
+    <div class="mini-photo-zone" id="nbPhotoZone" onclick="document.getElementById('nbPhotoInput').click()">
+      <div><strong>Clique pour ajouter une photo</strong></div>
+      <div style="font-size:12px; margin-top:4px;">JPG / PNG, photo de profil (optionnel)</div>
+    </div>
+    <input type="file" id="nbPhotoInput" accept="image/*" style="display:none;" onchange="handleNewBoeufPhoto()" />
+    <label>Nom / identifiant</label>
+    <input type="text" id="nbName" placeholder="Ex : Bœuf #12, Taureau Azawak" />
+    <label>Race</label>
+    <input type="text" id="nbBreed" placeholder="Zébu Azawak, N'Dama, Gudali…" />
+    <label>Date de naissance (estimée)</label>
+    <input type="date" id="nbBirth" />
+    <label>Tag / boucle</label>
+    <input type="text" id="nbTag" placeholder="Optionnel" />
+    <label>Notes</label>
+    <textarea id="nbNotes" rows="2" placeholder="Origine, traitements, etc."></textarea>
+    <div class="btn-row">
+      <button class="btn" onclick="saveBoeuf()">Ajouter au troupeau</button>
+      <button class="btn-secondary" onclick="closeModal('addBoeufModal')">Annuler</button>
+    </div>
+  </div>
+</div>
+<!-- MODAL CONFIG -->
+<div class="modal-overlay" id="configModal">
+  <div class="modal">
+    <h2>Paramètres</h2>
+    <p class="modal-sub">URL publique de ton backend Railway. Sans slash final.</p>
+    <label>URL de l'API</label>
+    <input type="text" id="cfgUrl" placeholder="https://boeuftrack-production.up.railway.app" />
+    <div class="btn-row">
+      <button class="btn" onclick="saveConfig()">Enregistrer</button>
+      <button class="btn-secondary" onclick="closeModal('configModal')">Annuler</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+// ============ CONFIG ============
+const LS_KEY = 'boeuftrack_api_url';
+let API = localStorage.getItem(LS_KEY) || 'https://boeuftrack-production.up.railway.app';
+let currentBoeuf = null;
+let currentAnalysis = null;
+let currentPhotos = [];  // [{ dataUrl, mediaType, angle, size }]
+const ANGLES = ['Profil gauche', 'Profil droit', 'Face', 'Arrière', 'Dessus dos', 'Autre'];
+let newBoeufPhoto = null;
+let chart = null;
+// ============ API CLIENT ============
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) }
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ error: r.statusText }));
+    throw new Error(err.error || r.statusText);
+  }
+  return r.json();
+}
+async function checkHealth() {
+  const dot = document.getElementById('apiStatus');
+  const txt = document.getElementById('apiStatusText');
+  try {
+    await api('/health');
+    dot.className = 'status-dot ok';
+    txt.textContent = 'API connectée';
+  } catch (e) {
+    dot.className = 'status-dot err';
+    txt.textContent = 'API hors ligne';
+  }
+}
+// ============ TOAST ============
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast ' + type, 3500);
+}
+// ============ MODALS ============
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openAddBoeufModal() { openModal('addBoeufModal'); }
+function openConfigModal() {
+  document.getElementById('cfgUrl').value = API;
+  openModal('configModal');
+}
+function saveConfig() {
+  const url = document.getElementById('cfgUrl').value.trim().replace(/\/$/, '');
+  if (!url) return;
+  API = url;
+  localStorage.setItem(LS_KEY, url);
+  closeModal('configModal');
+  checkHealth();
+  loadBoeufs();
+  toast('Configuration enregistrée');
+}
+// ============ BADGES (profile header) ============
+function renderBadges(b) {
+  const el = document.getElementById('bBadges');
+  if (!el) return;
+  const items = [];
+  if (b.breed) items.push(`<span class="badge badge-accent"><span class="badge-dot"></span>${escapeHtml(b.breed)}</span>`);
+  if (b.birthDate) {
+    const months = monthsBetween(new Date(b.birthDate), new Date());
+    if (months >= 0) items.push(`<span class="badge">${months} mois</span>`);
+  }
+  if (b.tagId) items.push(`<span class="badge">Tag ${escapeHtml(b.tagId)}</span>`);
+  el.innerHTML = items.join('');
+}
+function monthsBetween(a, b) {
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+}
+// ============ BOEUFS ============
+async function loadBoeufs() {
+  try {
+    const list = await api('/boeufs');
+    const ul = document.getElementById('boeufList');
+    if (list.length === 0) {
+      ul.innerHTML = '<li class="sidebar-empty">Aucun bœuf pour l\'instant.<br>Clique sur <strong>+ Ajouter</strong>.</li>';
+      return;
+    }
+    ul.innerHTML = list.map(b => `
+      <li class="boeuf-item ${currentBoeuf?.id === b.id ? 'active' : ''}" onclick="selectBoeuf('${b.id}')">
+        <div class="boeuf-item-body">
+          <div class="boeuf-avatar">${b.photoDataUrl ? `<img src="${b.photoDataUrl}" alt="">` : '🐂'}</div>
+          <div style="min-width:0; flex:1;">
+            <div class="boeuf-item-name">${escapeHtml(b.name)}</div>
+            <div class="boeuf-item-meta">${escapeHtml(b.breed || 'Race non précisée')}${b.tagId ? ' · ' + escapeHtml(b.tagId) : ''}</div>
+          </div>
+        </div>
+      </li>
+    `).join('');
+  } catch (e) {
+    toast('Erreur: ' + e.message, 'err');
+  }
+}
+function handleNewBoeufPhoto() {
+  const f = document.getElementById('nbPhotoInput').files[0];
+  if (!f) return;
+  if (f.size > 10 * 1024 * 1024) { toast('Photo > 10 Mo', 'err'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    newBoeufPhoto = reader.result;
+    const z = document.getElementById('nbPhotoZone');
+    z.classList.add('has');
+    z.innerHTML = `<img src="${reader.result}" /><div style="font-size:12px; color:var(--ink-mute); margin-top:6px;">Clique pour changer</div>`;
+  };
+  reader.readAsDataURL(f);
+}
+function resetNewBoeufModal() {
+  ['nbName','nbBreed','nbBirth','nbTag','nbNotes','nbPhotoInput'].forEach(id => document.getElementById(id).value = '');
+  newBoeufPhoto = null;
+  const z = document.getElementById('nbPhotoZone');
+  z.classList.remove('has');
+  z.innerHTML = `<div><strong>Clique pour ajouter une photo</strong></div><div style="font-size:12px; margin-top:4px;">JPG / PNG, photo de profil (optionnel)</div>`;
+}
+async function saveBoeuf() {
+  const name = document.getElementById('nbName').value.trim();
+  if (!name) { toast('Nom requis', 'err'); return; }
+  try {
+    const b = await api('/boeufs', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        breed: document.getElementById('nbBreed').value.trim() || null,
+        birthDate: document.getElementById('nbBirth').value || null,
+        tagId: document.getElementById('nbTag').value.trim() || null,
+        notes: document.getElementById('nbNotes').value.trim() || '',
+        photoDataUrl: newBoeufPhoto
+      })
+    });
+    resetNewBoeufModal();
+    closeModal('addBoeufModal');
+    await loadBoeufs();
+    selectBoeuf(b.id);
+    toast('Bœuf ajouté au troupeau');
+  } catch (e) {
+    toast('Erreur: ' + e.message, 'err');
+  }
+}
+async function uploadProfilePhoto() {
+  if (!currentBoeuf) return;
+  const f = document.getElementById('profilePhotoInput').files[0];
+  if (!f) return;
+  if (f.size > 10 * 1024 * 1024) { toast('Photo > 10 Mo', 'err'); return; }
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      await api('/boeufs/' + currentBoeuf.id, {
+        method: 'PATCH',
+        body: JSON.stringify({ photoDataUrl: reader.result })
+      });
+      currentBoeuf.photoDataUrl = reader.result;
+      renderProfilePhoto();
+      await loadBoeufs();
+      toast('Photo mise à jour');
+    } catch (e) {
+      toast('Erreur: ' + e.message, 'err');
+    }
+  };
+  reader.readAsDataURL(f);
+}
+function renderProfilePhoto() {
+  const el = document.getElementById('profilePhoto');
+  if (currentBoeuf?.photoDataUrl) {
+    el.innerHTML = `<img src="${currentBoeuf.photoDataUrl}" alt="" /><div class="edit-overlay">Changer<br>la photo</div>`;
+  } else {
+    el.innerHTML = `<span>🐂</span><div class="edit-overlay">Ajouter<br>une photo</div>`;
+  }
+}
+async function selectBoeuf(id) {
+  try {
+    currentBoeuf = await api('/boeufs/' + id);
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('boeufDetail').style.display = 'block';
+    document.getElementById('bName').textContent = currentBoeuf.name;
+    const meta = [
+      currentBoeuf.breed,
+      currentBoeuf.birthDate ? 'Né le ' + new Date(currentBoeuf.birthDate).toLocaleDateString('fr-FR') : null
+    ].filter(Boolean).join(' · ');
+    document.getElementById('bMeta').textContent = meta || 'Aucune info complémentaire';
+    renderBadges(currentBoeuf);
+    renderProfilePhoto();
+    await loadBoeufs();
+    await loadWeighings();
+    resetUpload();
+    loadSlaughters(currentBoeuf.id);
+  } catch (e) {
+    toast('Erreur: ' + e.message, 'err');
+  }
+}
+async function deleteBoeuf() {
+  if (!currentBoeuf) return;
+  if (!confirm('Supprimer ' + currentBoeuf.name + ' et toutes ses pesées ?')) return;
+  try {
+    await api('/boeufs/' + currentBoeuf.id, { method: 'DELETE' });
+    currentBoeuf = null;
+    document.getElementById('boeufDetail').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+    await loadBoeufs();
+    toast('Bœuf supprimé');
+  } catch (e) {
+    toast('Erreur: ' + e.message, 'err');
+  }
+}
+// ============ PHOTO UPLOAD + ANALYZE ============
+document.getElementById('uploadZone').addEventListener('click', () => document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', handleFile);
+['dragover','dragenter'].forEach(ev => document.getElementById('uploadZone').addEventListener(ev, e => {
+  e.preventDefault(); document.getElementById('uploadZone').classList.add('drag');
+}));
+['dragleave','drop'].forEach(ev => document.getElementById('uploadZone').addEventListener(ev, e => {
+  e.preventDefault(); document.getElementById('uploadZone').classList.remove('drag');
+}));
+document.getElementById('uploadZone').addEventListener('drop', e => {
+  const files = Array.from(e.dataTransfer.files || []);
+  if (files.length) { addFiles(files); }
+});
+function handleFile() {
+  const files = Array.from(document.getElementById('fileInput').files || []);
+  if (!files.length) return;
+  addFiles(files);
+  document.getElementById('fileInput').value = '';
+}
+function addFiles(files) {
+  const slots = 6 - currentPhotos.length;
+  if (slots <= 0) { toast('Maximum 6 photos', 'err'); return; }
+  files.slice(0, slots).forEach(f => {
+    if (!f.type.startsWith('image/')) return;
+    if (f.size > 10 * 1024 * 1024) { toast(`${f.name} > 10 Mo, ignoré`, 'err'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const used = new Set(currentPhotos.map(p => p.angle));
+      const defaultAngle = ANGLES.find(a => !used.has(a)) || 'Autre';
+      currentPhotos.push({
+        dataUrl: reader.result,
+        mediaType: f.type,
+        angle: defaultAngle,
+        size: f.size,
+        name: f.name
+      });
+      renderPhotoList();
+    };
+    reader.readAsDataURL(f);
+  });
+  if (files.length > slots) toast(`Seules les ${slots} premières photos ont été ajoutées (max 6)`, 'err');
+}
+function removePhoto(i) {
+  currentPhotos.splice(i, 1);
+  renderPhotoList();
+}
+function setPhotoAngle(i, angle) {
+  if (currentPhotos[i]) {
+    currentPhotos[i].angle = angle;
+    renderPhotoList();
+  }
+}
+function renderPhotoList() {
+  const grid = document.getElementById('photoGrid');
+  const list = document.getElementById('photoList');
+  const ctrls = document.getElementById('analyzeControls');
+  const z = document.getElementById('uploadZone');
+  const countEl = document.getElementById('analyzeCount');
+  if (currentPhotos.length === 0) {
+    list.style.display = 'none';
+    ctrls.style.display = 'none';
+    z.classList.remove('has-preview');
+    return;
+  }
+  z.classList.add('has-preview');
+  list.style.display = 'block';
+  ctrls.style.display = 'block';
+  countEl.textContent = `(${currentPhotos.length} photo${currentPhotos.length>1?'s':''})`;
+  if (!document.getElementById('dateInput').value) {
+    document.getElementById('dateInput').value = new Date().toISOString().slice(0,10);
+  }
+  grid.innerHTML = currentPhotos.map((p, i) => `
+    <div class="photo-thumb">
+      <img src="${p.dataUrl}" alt="" />
+      <select onchange="setPhotoAngle(${i}, this.value)">
+        ${ANGLES.map(a => `<option value="${a}" ${a===p.angle?'selected':''}>${a}</option>`).join('')}
+      </select>
+      <button class="photo-thumb-close" onclick="removePhoto(${i})" title="Retirer">×</button>
+    </div>
+  `).join('');
+}
+function resetUpload() {
+  currentPhotos = [];
+  currentAnalysis = null;
+  document.getElementById('fileInput').value = '';
+  const z = document.getElementById('uploadZone');
+  z.classList.remove('has-preview');
+  z.innerHTML = `
+    <div class="upload-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    </div>
+    <div class="upload-title">Dépose 1 à 6 photos ou clique pour choisir</div>
+    <div class="upload-hint">
+      Une seule photo suffit. Ajoute d'autres angles (<strong>profil</strong>, <strong>face</strong>, <strong>arrière</strong>, <strong>dessus du dos</strong>) pour gagner en précision. Animal entier, bien droit, ~2–3 m. JPG/PNG &lt; 10 Mo chacun.
+    </div>`;
+  document.getElementById('photoList').style.display = 'none';
+  document.getElementById('analyzeControls').style.display = 'none';
+  document.getElementById('analysisResult').style.display = 'none';
+}
+async function analyzePhoto() {
+  if (!currentPhotos.length) return;
+  const btn = document.getElementById('analyzeBtn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Analyse en cours…';
+  try {
+    const result = await api('/analyze', {
+      method: 'POST',
+      body: JSON.stringify({
+        images: currentPhotos.map(p => ({
+          data: p.dataUrl,
+          mediaType: p.mediaType,
+          angle: p.angle
+        })),
+        breed: currentBoeuf.breed,
+        context: document.getElementById('ctxInput').value.trim() || null
+      })
+    });
+    if (!result.success) throw new Error(result.error || 'Échec analyse');
+    currentAnalysis = result;
+    // Narrative banner (nouveau pipeline v2)
+    const narrEl = document.getElementById('rNarrative');
+    if (result.narrative) {
+      const extras = [];
+      if (result.breedResolved && result.breedResolved.label) {
+        extras.push(`ancrage race : <strong>${escapeHtml(result.breedResolved.label)}</strong> (${result.breedResolved.minKg}–${result.breedResolved.maxKg} kg)`);
+      }
+      if (result.detectionAvailable === false) extras.push('détecteur externe indisponible');
+      if (result.rejectedCount > 0) extras.push(`${result.rejectedCount} photo(s) écartée(s)`);
+      if (result.imagesUnreadable > 0) extras.push(`${result.imagesUnreadable} photo(s) illisible(s)`);
+      narrEl.innerHTML = `<strong>${escapeHtml(result.narrative)}</strong>${extras.length ? ' · ' + extras.join(' · ') : ''}`;
+      narrEl.style.display = 'block';
+    } else {
+      narrEl.style.display = 'none';
+    }
+    document.getElementById('rWeight').textContent = result.weightKg + ' kg';
+    document.getElementById('rRange').textContent = `fourchette ${result.rangeMin}–${result.rangeMax} kg`;
+    document.getElementById('rConf').innerHTML = confidencePill(result.confidence, result.confidenceBand);
+    document.getElementById('rBcs').textContent = (result.bcs != null ? result.bcs : '—') + ' / 5';
+    document.getElementById('rBreed').textContent = result.breedGuess || '—';
+    const used = result.imagesUsed ?? result.imagesAnalyzed ?? currentPhotos.length;
+    const provided = result.imagesProvided ?? currentPhotos.length;
+    document.getElementById('rImgs').textContent = (used === provided)
+      ? `${used} / ${provided}`
+      : `${used} utilisée(s) / ${provided} fournie(s)`;
+    document.getElementById('rObs').textContent = result.observations || result.narrative || '—';
+    document.getElementById('rLim').textContent = result.limitations || '—';
+    document.getElementById('analysisResult').style.display = 'block';
+  } catch (e) {
+    toast('Erreur analyse: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    document.getElementById('analyzeCount').textContent = `(${currentPhotos.length} photo${currentPhotos.length>1?'s':''})`;
+  }
+}
+function confidencePill(c, band) {
+  if (c == null) return '—';
+  // band provient du backend (high/medium/low). Si absent, on calcule sur les mêmes seuils.
+  let cls;
+  if (band === 'high') cls = 'good';
+  else if (band === 'medium') cls = 'mid';
+  else if (band === 'low') cls = 'low';
+  else cls = c >= 75 ? 'good' : c >= 55 ? 'mid' : 'low';
+  return `<span class="pill ${cls}">${c} %</span>`;
+}
+async function saveWeighing() {
+  if (!currentAnalysis || !currentBoeuf) return;
+  try {
+    const main = currentPhotos[0];
+    await api('/weighings', {
+      method: 'POST',
+      body: JSON.stringify({
+        boeufId: currentBoeuf.id,
+        weight: currentAnalysis.weightKg,
+        date: document.getElementById('dateInput').value || new Date().toISOString(),
+        confidence: currentAnalysis.confidence,
+        bcs: currentAnalysis.bcs,
+        observations: currentAnalysis.observations,
+        photoDataUrl: main ? main.dataUrl : null
+      })
+    });
+    resetUpload();
+    await loadWeighings();
+    toast('Pesée enregistrée');
+  } catch (e) {
+    toast('Erreur: ' + e.message, 'err');
+  }
+}
+// ============ WEIGHINGS + STATS + CHART ============
+async function loadWeighings() {
+  if (!currentBoeuf) return;
+  try {
+    const list = await api('/weighings?boeufId=' + currentBoeuf.id);
+    const gmq = await api('/boeufs/' + currentBoeuf.id + '/gmq');
+    renderStats(list, gmq);
+    renderTable(list);
+    renderChart(list);
+  } catch (e) {
+    toast('Erreur: ' + e.message, 'err');
+  }
+}
+function renderStats(list, gmq) {
+  const sorted = list.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+  const last = sorted[0];
+  document.getElementById('sPoids').innerHTML = last ? `${last.weight}<span class="stat-unit">kg</span>` : `—<span class="stat-unit">kg</span>`;
+  document.getElementById('sPoidsMeta').textContent = last ? 'le ' + new Date(last.date).toLocaleDateString('fr-FR') : 'Aucune pesée';
+  document.getElementById('sNb').textContent = list.length;
+  document.getElementById('sNbMeta').textContent = list.length ? `sur ${gmq.days || 0} jours` : 'À démarrer';
+  if (gmq.gmq != null) {
+    const gmqG = Math.round(gmq.gmq * 1000);
+    const el = document.getElementById('sGmq');
+    el.innerHTML = `${gmqG}<span class="stat-unit">g/j</span>`;
+    el.className = 'stat-value ' + (gmqG >= 700 ? 'gmq-good' : gmqG >= 400 ? '' : 'gmq-warn');
+    document.getElementById('sGmqMeta').textContent = `${gmq.weighings} pesées`;
+    document.getElementById('sGain').innerHTML = `${gmq.totalGain > 0 ? '+' : ''}${gmq.totalGain}<span class="stat-unit">kg</span>`;
+    document.getElementById('sGainMeta').textContent = `de ${gmq.firstWeight} à ${gmq.lastWeight} kg`;
+  } else {
+    document.getElementById('sGmq').innerHTML = `—<span class="stat-unit">g/j</span>`;
+    document.getElementById('sGmqMeta').textContent = 'Besoin de 2+ pesées';
+    document.getElementById('sGain').innerHTML = `—<span class="stat-unit">kg</span>`;
+    document.getElementById('sGainMeta').textContent = '—';
+  }
+}
+function renderTable(list) {
+  const el = document.getElementById('weighingsTable');
+  if (list.length === 0) {
+    el.innerHTML = '<div class="table-empty">Aucune pesée pour l\'instant.<br>Upload quelques photos ci-dessus pour lancer la 1ère analyse.</div>';
+    return;
+  }
+  const sorted = list.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+  el.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Photo</th><th>Date</th><th>Poids</th><th>Confiance</th><th>BCS</th><th>Observations</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${sorted.map(w => `
+          <tr>
+            <td>${w.photoDataUrl ? `<img src="${w.photoDataUrl}" class="weighing-photo" alt="">` : '<div class="weighing-photo-ph">🐂</div>'}</td>
+            <td>${new Date(w.date).toLocaleDateString('fr-FR')}</td>
+            <td><span class="weight-cell">${w.weight} kg</span></td>
+            <td>${w.confidence != null ? confidencePill(w.confidence) : '—'}</td>
+            <td><span class="tnum">${w.bcs != null ? w.bcs : '—'}</span></td>
+            <td style="max-width:300px; color:var(--ink-mute); font-size:12.5px;">${escapeHtml(w.observations || '').slice(0,90)}${(w.observations||'').length > 90 ? '…' : ''}</td>
+            <td style="text-align:right;"><button class="btn-danger" style="padding:4px 10px; font-size:11px;" onclick="delWeighing('${w.id}')">Supprimer</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+async function delWeighing(id) {
+  if (!confirm('Supprimer cette pesée ?')) return;
+  try {
+    await api('/weighings/' + id, { method: 'DELETE' });
+    await loadWeighings();
+  } catch (e) { toast('Erreur: ' + e.message, 'err'); }
+}
+function renderChart(list) {
+  const ctx = document.getElementById('growthChart').getContext('2d');
+  if (chart) chart.destroy();
+  const sorted = list.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+  // Dégradé sable → transparent
+  const grd = ctx.createLinearGradient(0, 0, 0, 280);
+  grd.addColorStop(0, 'rgba(184,130,10,0.18)');
+  grd.addColorStop(1, 'rgba(184,130,10,0.00)');
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: sorted.map(w => new Date(w.date).toLocaleDateString('fr-FR')),
+      datasets: [{
+        label: 'Poids (kg)',
+        data: sorted.map(w => w.weight),
+        borderColor: '#b8820a',
+        backgroundColor: grd,
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#b8820a',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1f2418', padding: 10, borderRadius: 8,
+          titleFont: { family: 'Inter', weight: '600' },
+          bodyFont: { family: 'Inter' },
+          displayColors: false,
+          callbacks: { label: (c) => `${c.parsed.y} kg` }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#8a8d82', font: { family: 'Inter', size: 11 } },
+          grid: { color: 'rgba(214,205,180,0.4)', drawBorder: false }
+        },
+        y: {
+          ticks: { color: '#8a8d82', font: { family: 'Inter', size: 11 } },
+          grid: { color: 'rgba(214,205,180,0.4)', drawBorder: false },
+          title: { display: true, text: 'kg', color: '#8a8d82', font: { family: 'Inter', size: 11 } }
+        }
+      }
+    }
+  });
+}
+// ============ UTILS ============
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+// ============ CARCASS CALIBRATION ============
+let _errorHistogramChart = null;
+let _precisionTimelineChart = null;
+
+async function saveSlaughter() {
+  if (!currentBoeuf) { toast('Sélectionne d\'abord un bœuf', 'err'); return; }
+  const date = document.getElementById('slDate').value;
+  const carcass = parseFloat(document.getElementById('slCarcass').value);
+  const yieldOv = document.getElementById('slYield').value;
+  const aiAt = document.getElementById('slAiWeight').value;
+  if (!date || !(carcass > 0)) { toast('Date et poids carcasse requis', 'err'); return; }
+  try {
+    const body = { boeufId: currentBoeuf.id, date, carcassWeight: carcass };
+    if (yieldOv) body.yieldOverride = parseFloat(yieldOv);
+    if (aiAt) body.aiWeightAtSlaughter = parseFloat(aiAt);
+    await api('/slaughters', { method: 'POST', body: JSON.stringify(body) });
+    toast('Abattage enregistré', 'ok');
+    ['slDate','slCarcass','slYield','slAiWeight'].forEach(i => document.getElementById(i).value = '');
+    await loadSlaughters(currentBoeuf.id);
+    await loadGlobalPrecision();
+  } catch (e) {
+    toast('Erreur : ' + e.message, 'err');
+  }
+}
+
+async function deleteSlaughter(id) {
+  if (!confirm('Supprimer cet abattage ?')) return;
+  try {
+    await api('/slaughters/' + id, { method: 'DELETE' });
+    await loadSlaughters(currentBoeuf?.id);
+    await loadGlobalPrecision();
+  } catch (e) { toast('Erreur : ' + e.message, 'err'); }
+}
+
+function fmtErr(p) {
+  if (p == null) return '—';
+  const abs = Math.abs(p);
+  const cls = abs > 20 ? 'carcass-err-big' : p >= 0 ? 'carcass-err-pos' : 'carcass-err-neg';
+  const sign = p > 0 ? '+' : '';
+  return `<span class="${cls}">${sign}${p.toFixed(1)} %</span>`;
+}
+
+async function loadSlaughters(boeufId) {
+  const container = document.getElementById('carcassList');
+  if (!container) return;
+  if (!boeufId) { container.innerHTML = '<div class="carcass-empty">Sélectionne un bœuf pour voir ses abattages.</div>'; return; }
+  try {
+    const list = await api('/slaughters?boeufId=' + encodeURIComponent(boeufId));
+    if (!list.length) { container.innerHTML = '<div class="carcass-empty">Aucun abattage enregistré pour ce bœuf.</div>'; return; }
+    container.innerHTML = list.map(s => {
+      const cls = s.isImpossible ? 'anomaly' : s.isAnomaly ? 'anomaly' : (s.errorPct != null && Math.abs(s.errorPct) <= 10 ? 'good' : '');
+      const dateStr = new Date(s.date).toLocaleDateString('fr-FR');
+      // Badge source IA : manual / before / after / absent
+      let aiLabel = 'IA';
+      if (s.aiSource === 'manual') aiLabel = 'IA (manuel)';
+      else if (s.aiSource === 'weighing_before' && s.daysBetween != null) aiLabel = `IA (${Math.round(Math.abs(s.daysBetween))}j avant)`;
+      else if (s.aiSource === 'weighing_after' && s.daysBetween != null) aiLabel = `IA (${Math.round(Math.abs(s.daysBetween))}j après ⚠)`;
+      const staleBadge = s.isStaleMatch ? ' <span style="color:var(--clay); font-size:10px;">· pesée ancienne</span>' : '';
+      const impossibleBadge = s.isImpossible
+        ? `<div style="grid-column: 1/-1; margin-top:6px; padding:6px 10px; background:rgba(154,44,44,0.08); border:1px solid rgba(154,44,44,0.3); border-radius:var(--r-sm); font-size:12px; color:var(--crimson);">
+             ⚠ Rendement implicite ${(s.implicitYield*100).toFixed(1)} % — physiquement impossible (carcasse > 70 % du poids vif IA). L'IA a dramatiquement sous-estimé OU la pesée IA date d'une période où l'animal était plus jeune.
+           </div>`
+        : '';
+      const rowMatch = s.isMatchable
+        ? `<div class="carcass-row-cell"><span class="carcass-row-label">Vif reconstitué</span><span class="carcass-row-value">${s.reconstructedLiveWeight} kg</span></div>
+           <div class="carcass-row-cell"><span class="carcass-row-label">${escapeHtml(aiLabel)}${staleBadge}</span><span class="carcass-row-value">${s.aiWeight} kg</span></div>
+           <div class="carcass-row-cell"><span class="carcass-row-label">Erreur · rdt impl.</span><span class="carcass-row-value">${fmtErr(s.errorPct)} · ${s.implicitYield != null ? (s.implicitYield*100).toFixed(1)+' %' : '—'}</span></div>`
+        : `<div class="carcass-row-cell" style="grid-column: span 3;"><span class="carcass-row-label">Pas d'estimation IA (± 365 j)</span><span class="carcass-row-value" style="color:var(--ink-mute);">Non comparable — saisis manuellement un poids IA ci-dessus</span></div>`;
+      return `
+        <div class="carcass-row ${cls}">
+          <div class="carcass-row-cell">
+            <span class="carcass-row-label">${escapeHtml(dateStr)}</span>
+            <span class="carcass-row-value">${s.carcassWeight} kg carcasse</span>
+            <span class="carcass-row-label" style="margin-top:2px;">rdt ${s.yieldApplied} · ${escapeHtml(s.yieldSource)}</span>
+          </div>
+          ${rowMatch}
+          <button class="btn-danger" onclick="deleteSlaughter('${s.id}')" title="Supprimer">✕</button>
+          ${impossibleBadge}
+        </div>`;
+    }).join('');
+  } catch (e) {
+    container.innerHTML = `<div class="carcass-empty">Erreur : ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function loadGlobalPrecision() {
+  try {
+    const [precRes, timelineRes] = await Promise.all([
+      api('/analytics/precision'),
+      api('/analytics/timeline')
+    ]);
+    const precision = precRes.precision || precRes;
+    const timeline = timelineRes.timeline || timelineRes;
+
+    document.getElementById('stBias').textContent = precision.bias != null ? (precision.bias > 0 ? '+' : '') + precision.bias + ' %' : '—';
+    document.getElementById('stMae').textContent  = precision.mae  != null ? precision.mae + ' %' : '—';
+    document.getElementById('stRmse').textContent = precision.rmse != null ? precision.rmse + ' %' : '—';
+    document.getElementById('stYield').textContent = precision.meanImplicitYield != null ? (precision.meanImplicitYield * 100).toFixed(1) + ' %' : '—';
+    document.getElementById('stYieldSub').textContent = `sur ${precision.n || 0} abattage${(precision.n || 0) > 1 ? 's' : ''} comparé${(precision.n || 0) > 1 ? 's' : ''}${precision.nUnmatched ? ` · ${precision.nUnmatched} non comparable${precision.nUnmatched > 1 ? 's' : ''}` : ''}`;
+
+    renderErrorHistogram(precision.histogram || []);
+    renderPrecisionTimeline(timeline || []);
+    renderAnomalies(precision.anomalies || []);
+  } catch (e) {
+    console.warn('loadGlobalPrecision', e);
+  }
+}
+
+function renderErrorHistogram(hist) {
+  const ctx = document.getElementById('errorHistogram');
+  if (!ctx) return;
+  const labels = hist.map(h => h.bucket);
+  const data = hist.map(h => h.count);
+  if (_errorHistogramChart) _errorHistogramChart.destroy();
+  _errorHistogramChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Nombre d\'abattages',
+        data,
+        backgroundColor: labels.map(l => {
+          if (l === '-5/0' || l === '0/5') return 'rgba(45,74,43,0.7)';
+          if (l.startsWith('<') || l.startsWith('>')) return 'rgba(154,44,44,0.7)';
+          return 'rgba(184,130,10,0.55)';
+        }),
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: 'Distribution des erreurs IA (%)', color: '#4d5246', font: { size: 12, weight: '600' } }
+      },
+      scales: {
+        x: { ticks: { color: '#8a8d82', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#8a8d82', precision: 0 }, grid: { color: 'rgba(138,141,130,0.12)' } }
+      }
+    }
+  });
+}
+
+function renderPrecisionTimeline(timeline) {
+  const ctx = document.getElementById('precisionTimeline');
+  if (!ctx) return;
+  if (_precisionTimelineChart) _precisionTimelineChart.destroy();
+  if (!timeline || !timeline.length) {
+    _precisionTimelineChart = null;
+    ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+    return;
+  }
+  _precisionTimelineChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: timeline.map(p => p.month),
+      datasets: [
+        { label: 'Biais (%)', data: timeline.map(p => p.bias), borderColor: '#b8820a', backgroundColor: 'rgba(184,130,10,0.15)', tension: 0.3, fill: false, pointRadius: 4 },
+        { label: 'MAE (%)',  data: timeline.map(p => p.mae),  borderColor: '#2d4a2b', backgroundColor: 'rgba(45,74,43,0.15)', tension: 0.3, fill: false, pointRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#4d5246', font: { size: 11 } } },
+        title: { display: true, text: 'Évolution de la précision (par mois)', color: '#4d5246', font: { size: 12, weight: '600' } }
+      },
+      scales: {
+        x: { ticks: { color: '#8a8d82', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#8a8d82' }, grid: { color: 'rgba(138,141,130,0.12)' } }
+      }
+    }
+  });
+}
+
+function renderAnomalies(anomalies) {
+  const el = document.getElementById('carcassAnomalies');
+  if (!el) return;
+  if (!anomalies || !anomalies.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="panel-title" style="font-size:12px; margin-bottom:6px;">Anomalies détectées (${anomalies.length})</div>
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      ${anomalies.map(a => `
+        <div style="padding:8px 10px; border:1px solid var(--border); border-left:3px solid var(--crimson); border-radius:var(--r-sm); font-size:12px;">
+          <strong>${escapeHtml(a.boeufName || a.boeufId)}</strong> · ${new Date(a.date).toLocaleDateString('fr-FR')} ·
+          carcasse ${a.carcassWeight} kg · IA ${a.aiWeight} kg ·
+          vif reconstitué ${a.reconstructedLiveWeight} kg · erreur ${fmtErr(a.errorPct)} ·
+          rendement implicite ${(a.implicitYield * 100).toFixed(1)} % ·
+          <span style="color:var(--ink-mute);">${a.reason === 'physically_impossible' ? 'rendement physiquement impossible (> 70 %)' : a.reason === 'yield_out_of_range' ? 'rendement implausible' : a.reason === 'error_and_yield' ? 'erreur ET rendement suspects' : 'erreur > 20 %'}</span>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+// ============ INIT ============
+checkHealth();
+loadBoeufs();
+loadGlobalPrecision();
+setInterval(checkHealth, 30000);
+</script>
+</body>
+</html>
